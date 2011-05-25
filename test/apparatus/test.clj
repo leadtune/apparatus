@@ -13,7 +13,7 @@
 ;; permissions and limitations under the License.
 
 (ns apparatus.test
-  (:use [apparatus config cluster]
+  (:use [apparatus config cluster remote-function]
         [clojure.test])
   (:import [java.util UUID]))
 
@@ -25,6 +25,31 @@
   (testing "apparatus"
     (let [config (-> (config) (config-group (uuid) (uuid)))
           instances (doall (many #(instance config)))]
+
+      (testing "should be able to call a remote future"
+        (testing "on randomly selected member (default behaviour)"
+          (is (= 5 @(remote-future-call (remote-fn + 3 2)))))
+
+        #_(testing "on a member that owns a key"
+            ;; TODO: replace :foo... need to find out what member owns the "foo-bar" key...
+            (let [expected-member :foo
+                  ])
+            (is (= expected-member
+                   @(remote-future-call local-member :with-key "foo-bar"))))
+
+        ;; TODO: figure out why these tests fail. Expected behavoir seen when members are in different JVMs..
+        #_(testing "on a specified member"
+          (let [expected-member (last (members))]
+            (is (= expected-member
+                   @(remote-future-call local-member :member expected-member)))))
+        #_(testing "on multiple specified members"
+            (let [expected-members (take 2 (members))]
+              (is (= (set expected-members)
+                     (set @(remote-future-call local-member :members expected-members))))))
+        #_(testing "on all members"
+          (is (= (set (members))
+                 (set @(remote-future-call local-member :all true))))))
+
       (testing "should be able to eval an sexp"
         (testing "on randomly selected member"
           (doall
@@ -60,7 +85,7 @@
                (is (every?
                     (fn [result] (= (eval sexp) result))
                     (-> (eval-each sexp (members))
-                        (.get)))))))))
+                              (.get))))))))))
       (testing "with a distributed map")
       (testing "with a distributed mmap")
       (testing "with a distributed set"
@@ -81,4 +106,4 @@
       (testing "with a distributed topic")
       (testing "with a distributed lock")
       (testing "with a distributed transaction")
-      (shutdown))))
+      (shutdown)))

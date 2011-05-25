@@ -13,8 +13,10 @@
 ;; permissions and limitations under the License.
 
 (ns apparatus.cluster
-  (:import [com.hazelcast.core Hazelcast DistributedTask MultiTask]
-           [apparatus Eval]))
+  (use apparatus.remote-function)
+  (:import [com.hazelcast.core Hazelcast DistributedTask MultiTask Member]
+           [apparatus Eval]
+           java.util.concurrent.Future))
 
 (defn instance
   "Configures and creates the default cluster instance & returns it.
@@ -40,22 +42,67 @@
   []
   (-> (Hazelcast/getCluster) (.getLocalMember)))
 
+(defn- remote-task
+  "Returns the appropriate task object for the given target-type and target,
+   as well as the process function that should be used on the results that
+   are returned from the task."
+  [^Callable f target-type target]
+  (let [task (condp = target-type
+                 nil (DistributedTask. f)
+                 :member (DistributedTask. f ^Member target)
+                 :members (MultiTask. f ^java.util.Set (set target))
+                 :all  (MultiTask. f ^java.util.Set (members))
+                 :with-key (DistributedTask. f ^Object target))]
+    [task (if (instance? MultiTask task) seq identity)]))
+
+(defn remote-future-call
+  "Like clojure.core/future-call but operates on a Hazelcast cluster.
+   The main caveat is that *f needs to be serializable*.
+   To help address this limitation you can use the remote-fn helper
+   function which requires the function be AOTC and args be serializable:
+
+   (remote-future-call (remote-fn some-fn arg1 arg2 arg3))
+
+   Another option is to use techomancy's serializable-fn:
+   https://github.com/technomancy/serializable-fn
+
+   However, serializable-fn has limitations (e.g. only the simplest
+   lexical contexts work) at the moment so proceed with caution. Once
+   Clojure has complete support for serializable functions via this
+   or natively we can add a remote-future macro (a'la clojure.core/future)."
+  [f & [target-type target]]
+  (let [[task process] (remote-task f target-type target)
+        ^Future fut (.submit (Hazelcast/getExecutorService) ^Runnable task)]
+    (reify
+      clojure.lang.IDeref
+      (deref [_] (process (.get fut)))
+      Future
+      (get [_] (process (.get fut)))
+      (get [_ timeout unit] (process (.get fut timeout unit)))
+      (isCancelled [_] (.isCancelled fut))
+      (isDone [_] (.isDone fut))
+      (cancel [_ interrupt?] (.cancel fut interrupt?)))))
+
 (defn eval-on
   [sexp target]
-  (let [task (DistributedTask. (Eval. sexp) target)]
+  (let [eval (Eval. sexp)
+        [task _] (if (instance? Member)
+               (remote-task eval :member target)
+               (remote-task eval :with-key target))]
     (-> (Hazelcast/getExecutorService)
+         ;; any reason for using #execute here?  If #submit is fine we can use 'remote-future-call
         (.execute task))
     task))
 
 (defn eval-any
   [sexp]
-  (-> (Hazelcast/getExecutorService)
-      (.submit (Eval. sexp))))
+  (remote-future-call (Eval. sexp)))
 
 (defn eval-each
   [sexp nodes]
   (let [task (MultiTask. (Eval. sexp) nodes)]
     (-> (Hazelcast/getExecutorService)
+         ;; any reason for using #execute here?  If #submit is fine we can use 'remote-future-call
         (.execute task))
     task))
 
