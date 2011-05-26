@@ -35,6 +35,11 @@
   []
   (-> (Hazelcast/getCluster) (.getMembers)))
 
+(defn local-member
+  "Returns the local member of the cluster."
+  []
+  (-> (Hazelcast/getCluster) (.getLocalMember)))
+
 (defn eval-on
   [sexp target]
   (let [task (DistributedTask. (Eval. sexp) target)]
