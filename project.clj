@@ -5,4 +5,6 @@
                  [commons-daemon "1.0.5"]]
   :aot [apparatus.eval]
   :main apparatus.main
-  :dev-dependencies [[swank-clojure "1.4.0-SNAPSHOT"]])
+  :dev-dependencies [[swank-clojure "1.4.0-SNAPSHOT"]
+                     [log4j/log4j "1.2.13"]]
+  :jvm-opts ["-Dhazelcast.logging.type=log4j"])
