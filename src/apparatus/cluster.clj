@@ -14,6 +14,7 @@
 
 (ns apparatus.cluster
   (use apparatus.remote-function)
+  (require [clojure.set :as set])
   (:import [com.hazelcast.core Hazelcast DistributedTask MultiTask Member]
            [apparatus Eval]
            java.util.concurrent.Future))
@@ -55,6 +56,8 @@
                  :with-key (DistributedTask. f ^Object target))]
     [task (if (instance? MultiTask task) seq identity)]))
 
+(def target-types #{:member :members :all :with-key})
+
 (defn remote-future-call
   "Like clojure.core/future-call but operates on a Hazelcast cluster.
    The main caveat is that *f needs to be serializable*.
@@ -70,9 +73,15 @@
    lexical contexts work) at the moment so proceed with caution. Once
    Clojure has complete support for serializable functions via this
    or natively we can add a remote-future macro (a'la clojure.core/future)."
-  [f & [target-type target]]
-  (let [[task process] (remote-task f target-type target)
-        ^Future fut (.submit (Hazelcast/getExecutorService) ^Runnable task)]
+  [f & options]
+  (let [{:keys [executor-service] :as options} (apply hash-map options)
+        target-type (let [types (set/intersection (set (keys options)) target-types)]
+                      (when (> (count types) 1)
+                        (throw (Exception. (str "You may only specify a single target. Possible targets: " target-types))))
+                      (first types))
+        [task process] (remote-task f target-type (get options target-types))
+        service (if executor-service (Hazelcast/getExecutorService executor-service) (Hazelcast/getExecutorService))
+        ^Future fut (.submit service ^Runnable task)]
     (reify
       clojure.lang.IDeref
       (deref [_] (process (.get fut)))
