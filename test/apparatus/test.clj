@@ -32,6 +32,10 @@
 
         #_(testing "on a member that owns a key"
             ;; TODO: replace :foo... need to find out what member owns the "foo-bar" key...
+            ;; Maybe create a helper function for this.. (key-owner "foo-bar")
+            ;; PartitionService partitionService = Hazelcast.getPartitionService();
+            ;; Partition partition = partitionService.getPartition(key);
+            ;; Member ownerMember = partition.getOwner();
             (let [expected-member :foo
                   ])
             (is (= expected-member
