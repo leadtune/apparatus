@@ -1,4 +1,4 @@
-(defproject com.leadtune/apparatus "1.0.0"
+(defproject com.leadtune/apparatus "1.0.1"
   :description "Apparatus: Clojure Clusters"
   :dependencies [[org.clojure/clojure "1.2.1"]
                  [com.hazelcast/hazelcast "1.9.4"]
