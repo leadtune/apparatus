@@ -1,6 +1,6 @@
-(defproject com.leadtune/apparatus "1.0.1"
+(defproject com.leadtune/apparatus "2.0.0-SNAPSHOT"
   :description "Apparatus: Clojure Clusters"
-  :dependencies [[org.clojure/clojure "1.2.1"]
+  :dependencies [[org.clojure/clojure "1.3.0"]
                  [com.hazelcast/hazelcast "1.9.4.6"]
                  [commons-daemon "1.0.5"]]
   :aot [apparatus.eval apparatus.remote-function]
